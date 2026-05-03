@@ -1,0 +1,48 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run Linter
+      run: npm run lint
+      
+    - name: Run Tests
+      run: npm test
+      env:
+        NODE_ENV: test
+        JWT_SECRET: test_secret_key_for_jwt_only
+        JWT_EXPIRES_IN: 1h
+        JWT_REFRESH_SECRET: test_refresh_secret_key
+        JWT_REFRESH_EXPIRES_IN: 7d
+
+  # Deployment job (optional, configure for your specific cloud provider)
+  # deploy:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - name: Deploy to Cloud Provider
+  #       run: echo "Deploying to production..."

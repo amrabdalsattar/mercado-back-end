@@ -4,7 +4,6 @@ const env = require('../config/env');
 
 // eslint-disable-next-line no-unused-vars
 const errorHandler = (err, req, res, next) => {
-  console.error('ERROR_HANDLER_CAUGHT:', err);
   let error = { ...err };
   error.message = err.message;
 
