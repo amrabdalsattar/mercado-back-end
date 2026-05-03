@@ -33,11 +33,10 @@ productSchema.index({ price: 1 });
 productSchema.index({ ratings: -1 });
 
 // Exclude soft-deleted products
-productSchema.pre(/^find/, function (next) {
+productSchema.pre(/^find/, function () {
   if (!this.getOptions().withDeleted) {
     this.where({ deletedAt: null });
   }
-  next();
 });
 
 const Product = mongoose.model('Product', productSchema);

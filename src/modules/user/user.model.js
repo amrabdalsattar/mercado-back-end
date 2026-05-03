@@ -40,11 +40,11 @@ const userSchema = new mongoose.Schema(
 );
 
 // Exclude soft-deleted users from queries by default
-userSchema.pre(/^find/, function (next) {
+userSchema.pre(/^find/, function () {
+  // Only execute this if we haven't explicitly asked for all users (e.g. admin tasks)
   if (!this.getOptions().withDeleted) {
     this.where({ deletedAt: null });
   }
-  next();
 });
 
 userSchema.methods.matchPassword = async function (candidatePassword) {

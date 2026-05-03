@@ -1,8 +1,8 @@
 const request = require('supertest');
 const app = require('../../src/app');
-const User = require('../../src/modules/auth/auth.model');
-const Product = require('../../src/modules/catalog/product.model');
-const Category = require('../../src/modules/catalog/category.model');
+const User = require('../../src/modules/user/user.model');
+const Product = require('../../src/modules/product/product.model');
+const Category = require('../../src/modules/category/category.model');
 const jwt = require('jsonwebtoken');
 const env = require('../../src/config/env');
 
@@ -18,22 +18,20 @@ describe('Commerce Flow Integration', () => {
   beforeAll(async () => {
     // 1. Create a user
     const user = await User.create({
-      firstName: 'Test',
-      lastName: 'Customer',
+      name: 'Test Customer',
       email: 'customer@test.com',
       password: 'Password123!',
       role: 'customer',
       isEmailVerified: true,
     });
     userId = user._id;
-    userToken = jwt.sign({ userId: user._id, role: user.role }, env.JWT_SECRET, {
+    userToken = jwt.sign({ userId: user._id, role: user.role }, env.JWT_ACCESS_SECRET, {
       expiresIn: '1h',
     });
 
     // 2. Create a seller
     const seller = await User.create({
-      firstName: 'Test',
-      lastName: 'Seller',
+      name: 'Test Seller',
       email: 'seller@test.com',
       password: 'Password123!',
       role: 'seller',
@@ -45,7 +43,7 @@ describe('Commerce Flow Integration', () => {
       status: 'active',
     });
     sellerId = seller._id;
-    sellerToken = jwt.sign({ userId: seller._id, role: seller.role }, env.JWT_SECRET, {
+    sellerToken = jwt.sign({ userId: seller._id, role: seller.role }, env.JWT_ACCESS_SECRET, {
       expiresIn: '1h',
     });
 
@@ -60,7 +58,7 @@ describe('Commerce Flow Integration', () => {
 
     // 4. Create a product
     const product = await Product.create({
-      name: 'Smartphone',
+      title: 'Smartphone',
       slug: 'smartphone',
       description: 'A great phone',
       price: 500,
@@ -75,8 +73,9 @@ describe('Commerce Flow Integration', () => {
 
   it('should get the product', async () => {
     const res = await request(app).get(`/api/v1/products/${productId}`);
+    if (res.statusCode !== 200) console.log('GET Product 404:', res.body);
     expect(res.statusCode).toEqual(200);
-    expect(res.body.data.name).toBe('Smartphone');
+    expect(res.body.data.title).toBe('Smartphone');
   });
 
   it('should add product to cart', async () => {
@@ -87,8 +86,10 @@ describe('Commerce Flow Integration', () => {
         productId: productId,
         quantity: 2,
       });
+    if (res.statusCode !== 200) console.log('CART ERROR:', res.body);
     expect(res.statusCode).toEqual(200);
-    expect(res.body.data.items[0].product.toString()).toBe(productId.toString());
+    const returnedProductId = res.body.data.items[0].product._id || res.body.data.items[0].product;
+    expect(returnedProductId.toString()).toBe(productId.toString());
     expect(res.body.data.items[0].quantity).toBe(2);
   });
 
@@ -107,6 +108,7 @@ describe('Commerce Flow Integration', () => {
         },
         paymentMethod: 'card',
       });
+    if (res.statusCode !== 201) console.log('ORDER ERROR:', res.body);
     expect(res.statusCode).toEqual(201);
     expect(res.body.data.orderStatus).toBe('pending');
     expect(res.body.data.totalAmount).toBe(1000); // 2 * 500
@@ -123,15 +125,14 @@ describe('Commerce Flow Integration', () => {
 
   it('should process payment', async () => {
     const res = await request(app)
-      .post(`/api/v1/payments/process`)
+      .post('/api/v1/payment/card/pay')
       .set('Authorization', `Bearer ${userToken}`)
       .send({
         orderId: orderId,
-        paymentDetails: {
-          cardNumber: '4242424242424242', // mock
-          expiry: '12/25',
-          cvv: '123',
-        },
+        cardNumber: '4111222233334444',
+        expiryMonth: '12',
+        expiryYear: '2030',
+        cvv: '123'
       });
     expect(res.statusCode).toEqual(200);
     expect(res.body.data.status).toBe('completed');
