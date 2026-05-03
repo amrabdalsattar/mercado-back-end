@@ -22,6 +22,9 @@ class ReviewService {
 
     // Check if user has purchased the product
     const hasPurchased = await orderRepo.hasUserPurchasedProduct(userId, productId);
+    if (!hasPurchased) {
+      throw new AppError('You can only review products you have purchased and received', 403, 'NOT_PURCHASED');
+    }
 
     const review = await reviewRepo.create({
       product: productId,

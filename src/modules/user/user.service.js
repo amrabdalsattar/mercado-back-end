@@ -5,6 +5,7 @@ const AppError = require('../../utils/AppError');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../../utils/token');
 const { sendEmail } = require('../../utils/email');
 const notificationService = require('../notification/notification.service');
+const cartService = require('../cart/cart.service');
 const env = require('../../config/env');
 
 class UserService {
@@ -46,7 +47,7 @@ class UserService {
     return { message: 'Email verified successfully. You can now log in.' };
   }
 
-  async login({ email, password }) {
+  async login({ email, password }, sessionId) {
     const user = await userRepo.findByEmailWithPassword(email);
     if (!user) throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
     if (!user.isActive) throw new AppError('Your account has been suspended', 403, 'ACCOUNT_SUSPENDED');
@@ -74,6 +75,12 @@ class UserService {
     const refreshToken = signRefreshToken(payload);
 
     await userRepo.updateById(user._id, { refreshToken });
+
+    if (sessionId) {
+      await cartService.mergeCart(user._id, sessionId).catch((err) => {
+        console.error('Failed to merge cart on login:', err);
+      });
+    }
 
     return { accessToken, refreshToken, user: this._sanitize(user) };
   }

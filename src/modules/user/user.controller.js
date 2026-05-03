@@ -15,7 +15,8 @@ exports.verifyEmail = asyncHandler(async (req, res) => {
 });
 
 exports.login = asyncHandler(async (req, res) => {
-  const { accessToken, refreshToken, user } = await userService.login(req.body);
+  const sessionId = req.headers['x-session-id'] || req.cookies.sessionId;
+  const { accessToken, refreshToken, user } = await userService.login(req.body, sessionId);
 
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
@@ -25,6 +26,12 @@ exports.login = asyncHandler(async (req, res) => {
   });
 
   ApiResponse.success(res, 200, 'Login successful', { accessToken, user });
+});
+
+exports.topUpWallet = asyncHandler(async (req, res) => {
+  const { amount } = req.body;
+  const user = await userService.topUpWallet(req.user.id, amount);
+  ApiResponse.success(res, 200, 'Wallet topped up successfully', { balance: user.wallet });
 });
 
 exports.refresh = asyncHandler(async (req, res) => {

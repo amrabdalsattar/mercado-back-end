@@ -110,4 +110,6 @@ router.get('/users/me/wishlist', authenticate, controller.getWishlist);
 router.post('/users/me/wishlist/:productId', authenticate, controller.addToWishlist);
 router.delete('/users/me/wishlist/:productId', authenticate, controller.removeFromWishlist);
 
+router.post('/users/me/wallet/topup', authenticate, controller.topUpWallet);
+
 module.exports = router;

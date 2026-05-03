@@ -3,6 +3,7 @@ const cartRepo = require('../cart/cart.repository');
 const productRepo = require('../product/product.repository');
 const promoRepo = require('../promo/promo.repository');
 const userRepo = require('../user/user.repository');
+const sellerRepo = require('../seller/seller.repository');
 const AppError = require('../../utils/AppError');
 const notificationService = require('../notification/notification.service');
 
@@ -85,6 +86,11 @@ class OrderService {
     // Clear cart
     await cartRepo.clearCart(cart._id);
 
+    // Credit sellers if paid
+    if (paymentStatus === 'paid') {
+      await this._creditSellers(order);
+    }
+
     // Send confirmation email
     const user = await userRepo.findById(userId);
     notificationService.sendOrderConfirmation(user, order).catch(() => {});
@@ -134,7 +140,11 @@ class OrderService {
     }
 
     if (status === 'delivered') {
-      await orderRepo.updateById(orderId, { paymentStatus: 'paid' });
+      // If it was COD, it's now paid
+      if (order.paymentStatus !== 'paid') {
+        await orderRepo.updateById(orderId, { paymentStatus: 'paid' });
+        await this._creditSellers(order);
+      }
     }
 
     const updatedOrder = await orderRepo.findById(orderId);
@@ -154,8 +164,25 @@ class OrderService {
     if (!cancellableStatuses.includes(order.orderStatus)) {
       throw new AppError('Order cannot be cancelled at this stage', 400, 'CANNOT_CANCEL');
     }
-
     return this.updateStatus(orderId, { status: 'cancelled', note: 'Cancelled by customer' }, { role: 'admin', id: userId });
+  }
+
+  async _creditSellers(order) {
+    const PLATFORM_FEE_PERCENT = 10; // 10% platform fee
+    const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const discountFactor = subtotal > 0 ? (subtotal - (order.discount || 0)) / subtotal : 1;
+
+    for (const item of order.items) {
+      if (!item.seller) continue;
+
+      const grossItemRevenue = item.price * item.quantity * discountFactor;
+      const platformFee = (grossItemRevenue * PLATFORM_FEE_PERCENT) / 100;
+      const netEarnings = grossItemRevenue - platformFee;
+
+      await sellerRepo.incrementEarnings(item.seller, netEarnings).catch((err) => {
+        console.error(`Failed to credit seller ${item.seller} for order ${order._id}:`, err);
+      });
+    }
   }
 }
 

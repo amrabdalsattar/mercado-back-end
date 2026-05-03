@@ -91,6 +91,41 @@ class CartService {
     return summary;
   }
 
+  async mergeCart(userId, sessionId) {
+    if (!sessionId) return;
+
+    const guestCart = await cartRepo.findByUser(null, sessionId);
+    if (!guestCart || !guestCart.items.length) return;
+
+    let userCart = await cartRepo.findByUser(userId, null);
+
+    if (!userCart) {
+      // Just transfer ownership
+      await cartRepo.updateById(guestCart._id, { user: userId, sessionId: null });
+    } else {
+      // Merge items
+      for (const gItem of guestCart.items) {
+        const existingIndex = userCart.items.findIndex(
+          (uItem) => uItem.product._id.toString() === gItem.product._id.toString()
+        );
+
+        if (existingIndex > -1) {
+          userCart.items[existingIndex].quantity += gItem.quantity;
+        } else {
+          userCart.items.push({
+            product: gItem.product._id,
+            quantity: gItem.quantity,
+            price: gItem.price,
+          });
+        }
+      }
+      await userCart.save();
+      await cartRepo.clearCart(guestCart._id); // Clear and delete? Or just delete?
+      // Repository clearCart just clears items. Let's delete the guest cart document.
+      await guestCart.deleteOne();
+    }
+  }
+
   async _buildSummary(cart) {
     const subtotal = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     return { cart, subtotal: +subtotal.toFixed(2), discount: 0, total: +subtotal.toFixed(2) };

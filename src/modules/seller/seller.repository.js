@@ -24,6 +24,14 @@ class SellerRepository {
       { arrayFilters: [{ 'req._id': payoutId }], new: true }
     );
   }
+
+  incrementEarnings(sellerId, amount) {
+    return Seller.findOneAndUpdate(
+      { user: sellerId },
+      { $inc: { totalEarnings: amount, pendingPayout: amount } },
+      { new: true }
+    );
+  }
 }
 
 module.exports = new SellerRepository();
